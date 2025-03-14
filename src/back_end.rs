@@ -1,15 +1,12 @@
-//use std::collections::HashMap;
-//use crate::error::RunnerError;
+use std::io::Cursor;
 
-//use task::TaskHolder;
+use image::{DynamicImage, ImageFormat, RgbImage, RgbaImage};
+use win_screenshot::prelude::*;
 use win_screenshot::utils::HwndName;
 
 //  //  //  //  //  //  //  //
 #[derive(Default)]
-pub struct Backend {
-    //counter: usize,
-    //list: HashMap<usize, TaskHolder>,
-}
+pub struct Backend {}
 
 impl Backend {
     pub fn list(&self) -> String {
@@ -18,22 +15,26 @@ impl Backend {
             return "some error".to_owned();
         };
         let mut res = String::new();
-        for HwndName { hwnd, window_name }  in win_list.into_iter() {
-            res += &format!("x0:{:x} <- [{}]\n", hwnd, window_name);
+        for HwndName { hwnd, window_name } in win_list.into_iter() {
+            res += &format!("{} x0:{:x} <- [{}]\n", hwnd, hwnd, window_name);
         }
         res
     }
 
-
-    /*
-    pub fn get(&self, id: usize) -> Result<String, RunnerError > {
-        let Some(res) = self.list.get(&id) else {
-            return Err(RunnerError::WrongId);
+    pub fn display_screenshot(&self) -> Option<Vec<u8>> {
+        let Ok(buf) = capture_display() else {
+            return None;
         };
-
-        Ok(res.info())
+        regenerator(buf)
+    }
+    pub fn window_screenshot(&self, hwnd: isize) -> Option<Vec<u8>> {
+        let Ok(buf) = capture_window(hwnd) else {
+            return None;
+        };
+        regenerator(buf)
     }
 
+    /*
     pub fn insert(&mut self, info: &str) -> Result<usize, RunnerError> {
         self.counter += 1;
         let Ok(task) = TaskHolder::new(&info) else {
@@ -61,6 +62,19 @@ impl Backend {
         text
     }
     */
+}
+
+fn regenerator(buf: RgbBuf) -> Option<Vec<u8>> {
+    let Some(rgba) = RgbaImage::from_raw(buf.width, buf.height, buf.pixels) else {
+        return None;
+    };
+    let mut writter = Cursor::new(Vec::new());
+    DynamicImage::ImageRgba8(rgba)
+        .write_to(&mut writter, ImageFormat::Png)
+        .unwrap();
+    //
+    let res = writter.into_inner();
+    Some(res)
 }
 
 //  //  //  //  //  //  //  //

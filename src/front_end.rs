@@ -8,8 +8,6 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Self {
         let back = crate::back_end::Backend::default();
-        //runner.insert("one-1").unwrap();
-        //runner.insert("two-2").unwrap();
         println!("\n[+]AppState\n");
         Self {
             backend: RwLock::new(back),
@@ -22,8 +20,11 @@ impl AppState {
 
 pub mod methods {
     use super::AppState;
-    //use actix_web::{delete, get, post, web, Responder};
-    use actix_web::{get, web, Responder};
+    use actix_web::{
+        get,
+        http::{header::ContentType, StatusCode},
+        web, HttpResponse, Responder,
+    };
 
     #[derive(serde::Deserialize)]
     struct ItemID {
@@ -36,10 +37,40 @@ pub mod methods {
         let backend = state.backend.read().unwrap();
         backend.list()
     }
+
+    #[get("/display")]
+    async fn display_screenshot(state: web::Data<AppState>) -> Option<impl Responder> {
+        println!("display");
+        let backend = state.backend.read().unwrap();
+        let Some(img) = backend.display_screenshot() else {
+            return None;
+        };
+        Some(
+            HttpResponse::Ok()
+                .content_type(ContentType::jpeg())
+                .body(img),
+        )
+    }
+
+    #[get("/window/{hwnd}")]
+    async fn window_screenshot(
+        state: web::Data<AppState>,
+        path: web::Path<usize>,
+    ) -> Option<impl Responder> {
+        let hwnd = path.into_inner() as isize;
+        println!("get item {}", hwnd);
+        let backend = state.backend.read().unwrap();
+        let Some(img) = backend.window_screenshot(hwnd) else {
+            return None;
+        };
+        Some(
+            HttpResponse::Ok()
+                .content_type(ContentType::jpeg())
+                .body(img),
+        )
+    }
 }
 //use crate::error::RunnerError;
-//use actix_web::Result;
-//use actix_web::http::StatusCode;
 
 /*
 //  //  //  //  //  //  //  //
