@@ -1,0 +1,10 @@
+[package]
+name = "web_screen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap = { version = "4.5.31", features = ["derive"] }
+actix-web = "4.9.0"
+serde = { version = "1.0.219", features = ["derive"] }
+win-screenshot = "4.0.12"
