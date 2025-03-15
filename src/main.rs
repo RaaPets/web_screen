@@ -19,6 +19,9 @@ async fn main() -> std::io::Result<()> {
             .service(get_list)
             .service(display_screenshot)
             .service(window_screenshot)
+            .service(
+                tester
+            )
     })
     .bind((config.bind, config.port))?
     .run()

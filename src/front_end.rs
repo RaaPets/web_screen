@@ -17,18 +17,30 @@ impl AppState {
 
 //  //  //  //  //  //  //  //
 //  //  //  //  //  //  //  //
-
 pub mod methods {
     use super::AppState;
-    use actix_web::{
-        get,
-        http::{header::ContentType, StatusCode},
-        web, HttpResponse, Responder,
-    };
+    use actix_web::http::{header::ContentType, StatusCode};
+    use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
 
     #[derive(serde::Deserialize)]
     struct ItemID {
         id: Option<usize>,
+    }
+
+    #[get("/test/{AA}/{BB}/")]
+    pub async fn tester(state: web::Data<AppState>, 
+        //path: web::Path<String>,
+        req: HttpRequest,
+    ) -> impl Responder {
+        //let (a, b, c) = path.into_inner();
+        //println!("test: {:?}-{:?}-{:?}", a, b, c);
+        //println!("test: {:?}", path);
+        let v1: String = req.match_info().get("AA").unwrap().parse().unwrap();
+        let v2: String = req.match_info().query("BB").parse().unwrap();
+        let (v3,v4): (String, String) = req.match_info().load().unwrap();
+        println!("!! {} {} {} {}", v1,v2,v3,v4);
+
+        "<- * ->".to_owned()
     }
 
     #[get("/list")]

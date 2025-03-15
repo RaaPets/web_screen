@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use image::{DynamicImage, ImageFormat, RgbImage, RgbaImage};
+use image::{DynamicImage, ImageFormat, RgbaImage};
 use win_screenshot::prelude::*;
 use win_screenshot::utils::HwndName;
 
@@ -33,35 +33,6 @@ impl Backend {
         };
         regenerator(buf)
     }
-
-    /*
-    pub fn insert(&mut self, info: &str) -> Result<usize, RunnerError> {
-        self.counter += 1;
-        let Ok(task) = TaskHolder::new(&info) else {
-            todo!()
-        };
-        self.list.insert(self.counter, task);
-
-        Ok(self.counter)
-    }
-
-    pub fn remove(&mut self, id: usize) -> Result<String, RunnerError> {
-        let Some(res) = self.list.remove(&id) else {
-            return Err(RunnerError::WrongId);
-        };
-
-        Ok(res.info())
-    }
-
-    pub fn list(&self) -> String {
-        let mut text = String::new();
-        for (id, item) in &self.list {
-            text += &format!("id({}) <{}>\n", id, &item.info());
-        }
-
-        text
-    }
-    */
 }
 
 fn regenerator(buf: RgbBuf) -> Option<Vec<u8>> {
