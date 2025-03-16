@@ -1,6 +1,6 @@
 mod config;
 mod front_end;
-use front_end::{AppState, methods::*};
+use front_end::{methods::*, AppState};
 mod back_end;
 //mod error;
 
@@ -16,10 +16,12 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .app_data(state.clone())
-            .service(get_list)
+            .service(get_login_page)
+            .service(post_auth)
+            .service(get_welcome)
+            .service(get_watch)
             .service(screenshot)
-            //.service(display_screenshot)
-            //.service(window_screenshot)
+            .default_service(web::route().to(not_found))
     })
     .bind((config.bind, config.port))?
     .run()
