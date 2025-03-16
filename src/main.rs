@@ -17,11 +17,9 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(state.clone())
             .service(get_list)
-            .service(display_screenshot)
-            .service(window_screenshot)
-            .service(
-                tester
-            )
+            .service(screenshot)
+            //.service(display_screenshot)
+            //.service(window_screenshot)
     })
     .bind((config.bind, config.port))?
     .run()

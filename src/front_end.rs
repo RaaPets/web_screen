@@ -20,34 +20,83 @@ impl AppState {
 pub mod methods {
     use super::AppState;
     use actix_web::http::{header::ContentType, StatusCode};
-    use actix_web::{get, web, HttpRequest, HttpResponse, Responder};
+    use actix_web::{get, web, HttpResponse, Responder};
+
+    #[derive(Debug, PartialEq)]
+    enum AuthStatus {
+        Unknown,
+        Ok,
+    }
+    impl AuthStatus {
+        fn from_query(query: &web::Query<AuthInfo>) -> Self {
+            let Some(ref user) = query.user else {
+                return Self::Unknown;
+            };
+            let Some(ref pin) = query.pin else {
+                return Self::Unknown;
+            };
+            Self::from_user(user, pin)
+        }
+
+        fn from_user(user: &str, pin: &str) -> Self {
+            match (user, pin) {
+                ("tester", "42") => {
+                    return Self::Ok;
+                }
+                _ => {
+                    return Self::Unknown;
+                }
+            }
+        }
+    }
 
     #[derive(serde::Deserialize)]
-    struct ItemID {
-        id: Option<usize>,
+    struct AuthInfo {
+        user: Option<String>,
+        pin: Option<String>,
     }
 
-    #[get("/test/{AA}/{BB}/")]
-    pub async fn tester(state: web::Data<AppState>, 
-        //path: web::Path<String>,
-        req: HttpRequest,
-    ) -> impl Responder {
-        //let (a, b, c) = path.into_inner();
-        //println!("test: {:?}-{:?}-{:?}", a, b, c);
-        //println!("test: {:?}", path);
-        let v1: String = req.match_info().get("AA").unwrap().parse().unwrap();
-        let v2: String = req.match_info().query("BB").parse().unwrap();
-        let (v3,v4): (String, String) = req.match_info().load().unwrap();
-        println!("!! {} {} {} {}", v1,v2,v3,v4);
-
-        "<- * ->".to_owned()
+    fn auth_failed() -> HttpResponse {
+        HttpResponse::build(StatusCode::LOCKED)
+            .content_type(ContentType::plaintext())
+            .body("no or invalide user/pin pair")
     }
 
-    #[get("/list")]
-    async fn get_list(state: web::Data<AppState>, query: web::Query<ItemID>) -> impl Responder {
-        println!("get list {:?}", query.id);
+    #[get("/")]
+    async fn get_list(state: web::Data<AppState>, query: web::Query<AuthInfo>) -> HttpResponse {
+        let status = AuthStatus::from_query(&query);
+        println!("{:?} gets status {:?}", query.user, status);
+        if AuthStatus::from_query(&query) == AuthStatus::Unknown {
+            return auth_failed();
+        }
+
         let backend = state.backend.read().unwrap();
-        backend.list()
+        HttpResponse::Ok()
+            .content_type(ContentType::plaintext())
+            .body(backend.list())
+    }
+
+    #[get("/{target}")]
+    async fn screenshot(
+        state: web::Data<AppState>,
+        path: web::Path<String>,
+        query: web::Query<AuthInfo>,
+    ) -> HttpResponse {
+        let status = AuthStatus::from_query(&query);
+        println!("{:?} gets status {:?}", query.user, status);
+        if AuthStatus::from_query(&query) == AuthStatus::Unknown {
+            return auth_failed();
+        }
+
+        let target = path.into_inner();
+        if target == "screen" {
+            println!("target -> Screen");
+        } else {
+            println!("target ->> {}", target);
+        }
+        HttpResponse::Ok()
+            .content_type(ContentType::plaintext())
+            .body("")
     }
 
     #[get("/display")]
@@ -82,41 +131,3 @@ pub mod methods {
         )
     }
 }
-//use crate::error::RunnerError;
-
-/*
-//  //  //  //  //  //  //  //
-
-#[get("/task/{id}")]
-async fn get_item(
-    state: web::Data<AppState>,
-    path: web::Path<usize>,
-) -> Result<impl Responder, RunnerError> {
-    let id = path.into_inner();
-    println!("get item {}", id);
-    let runner = state.runner.read().unwrap();
-    Ok(runner.get(id)?.clone())
-}
-
-#[post("/")]
-async fn insert_item(
-    state: web::Data<AppState>,
-    info: String,
-) -> Result<(impl Responder, StatusCode), RunnerError> {
-    println!("insert item\n'{}'", info);
-    let mut runner = state.runner.write().unwrap();
-    let new_id = runner.insert(&info)?;
-    Ok((format!("{}", new_id), StatusCode::CREATED))
-}
-
-#[delete("/task/{id}")]
-async fn delete_item(
-    state: web::Data<AppState>,
-    path: web::Path<usize>,
-) -> Result<impl Responder, RunnerError> {
-    let id = path.into_inner();
-    println!("DELETE item {}", id);
-    let mut runner = state.runner.write().unwrap();
-    Ok(runner.remove(id)?.clone())
-}
-*/
