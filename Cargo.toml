@@ -9,3 +9,4 @@ actix-web = "4.9.0"
 serde = { version = "1.0.219", features = ["derive"] }
 win-screenshot = "4.0.12"
 image = "0.25.5"
+dyn-fmt = "0.4.3"

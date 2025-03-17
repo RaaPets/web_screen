@@ -9,16 +9,17 @@ use win_screenshot::utils::HwndName;
 pub struct Backend {}
 
 impl Backend {
-    pub fn list(&self) -> String {
+    pub fn try_list(&self) -> Result<Vec<(isize,String)>, String> {
         println!("backend.list()");
         let Ok(win_list) = win_screenshot::utils::window_list() else {
-            return "some error".to_owned();
+            return Err("some WinScreenshot error".to_owned());
         };
-        let mut res = String::new();
+        let mut res = Vec::new();
         for HwndName { hwnd, window_name } in win_list.into_iter() {
-            res += &format!("{} x0:{:x} <- [{}]\n", hwnd, hwnd, window_name);
+            //res += &format!("{} x0:{:x} <- [{}]\n", hwnd, hwnd, window_name);
+            res.push((hwnd, window_name));
         }
-        res
+        Ok(res)
     }
 
     pub fn display_screenshot(&self) -> Option<Vec<u8>> {

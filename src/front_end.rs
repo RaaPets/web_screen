@@ -2,30 +2,49 @@
 use std::sync::RwLock;
 
 pub struct AppState {
+    user_name: String,
+    password: String,
     backend: RwLock<crate::back_end::Backend>,
+    session_id: RwLock<String>,
 }
 
 impl AppState {
-    pub fn new() -> Self {
+    pub fn new(user_name: &str, password: &str) -> Self {
         let back = crate::back_end::Backend::default();
         println!("\n[+]AppState\n");
         Self {
+            user_name: user_name.to_owned(),
+            password: password.to_owned(),
             backend: RwLock::new(back),
+            session_id: RwLock::new(String::new()),
         }
     }
 
     pub fn login(&self, user: &str, pass: &str) -> Option<String> {
-        if user != "admin" || pass != "123" {
+        if user != self.user_name || pass != self.password {
             return None;
         }
-        Some("admin_session".to_owned())
+        let t = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH).unwrap()
+            .as_nanos();
+        let new_session_id = format!("{:x}",t);
+        println!("new session id: {}", new_session_id);
+        let mut session = self.session_id.write().unwrap();
+        *session = new_session_id.clone();
+        Some(new_session_id)
     }
 
     pub fn check_session(&self, session: &str) -> bool {
-        if session == "admin_session" {
+        let valid_session = self.session_id.read().unwrap();
+        if valid_session.is_empty() {
+            println!("there is no registered session");
+            return false;
+        };
+        if session == *valid_session {
             return true;
         }
 
+        println!("invalid session");
         false
     }
 }
@@ -34,6 +53,7 @@ impl AppState {
 //  //  //  //  //  //  //  //
 pub mod methods {
     use super::*;
+    use dyn_fmt::AsStrFormatExt;
     use actix_web::http::header::LOCATION;
     use actix_web::http::{header::ContentType, StatusCode};
     use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
@@ -41,7 +61,9 @@ pub mod methods {
     //  //  //  //  //  //  //
     #[get("/login")]
     async fn get_login_page() -> HttpResponse {
-        HttpResponse::Ok().body(HTML_LOGIN)
+        HttpResponse::Ok()
+            .content_type(ContentType::html())
+            .body(HTML_LOGIN)
     }
 
     //  //  //  //  //  //  //
@@ -50,7 +72,7 @@ pub mod methods {
         state: web::Data<AppState>,
         form: web::Form<CredentialsInfo>,
     ) -> impl Responder {
-        println!("post auth: {:?}", form);
+        println!("auth: {:?}", form);
         let Some(session) = state.login(&form.username, &form.password) else {
             return HttpResponse::Forbidden().body("invalid credentials");
         };
@@ -61,7 +83,7 @@ pub mod methods {
 
     //  //  //  //  //  //  //
     #[get("/session/{session}")]
-    async fn get_welcome(state: web::Data<AppState>, session: web::Path<String>) -> impl Responder {
+    async fn get_welcome(state: web::Data<AppState>, session: web::Path<String>) -> HttpResponse {
         println!("welcome: {:?}", session);
         if !state.check_session(&session) {
             return HttpResponse::Found()
@@ -70,7 +92,25 @@ pub mod methods {
         }
 
         let backend = state.backend.read().unwrap();
-        HttpResponse::Ok().body(format!("LIST:\n{}", backend.list()))
+        match backend.try_list() {
+            Ok(list) => {
+                let mut list_block = String::new();
+                list_block += &format!("\n<a href=\"/session/{session}/watch\">DESKTOP</a><br>");
+                for (hwnd, win_name) in &list {
+                    list_block += &format!(
+                        "\n<a href=\"/session/{session}/watch?hwnd={hwnd}\">[{:x}] {win_name}</a><br>",
+                        hwnd
+                        );
+                }
+                return HttpResponse::Ok()
+                    .content_type(ContentType::html())
+                    .body(HTML_LIST.format([&list_block]));
+            }
+            Err(e) => {
+                return HttpResponse::build(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(format!("Internal Server Error:\n{}", e));
+            }
+        }
     }
 
     //  //  //  //  //  //  //
@@ -105,38 +145,6 @@ pub mod methods {
                 .content_type(ContentType::jpeg())
                 .body(img);
         }
-
-        HttpResponse::Ok().body(format!("WATCH"))
-    }
-
-    //  //  //  //  //  //  //
-    fn auth_failed() -> HttpResponse {
-        HttpResponse::build(StatusCode::LOCKED)
-            .content_type(ContentType::plaintext())
-            .body("no or invalide user/pin pair")
-    }
-
-    #[get("/{target}")]
-    async fn screenshot(
-        _state: web::Data<AppState>,
-        path: web::Path<String>,
-        query: web::Query<CredentialsInfo>,
-    ) -> HttpResponse {
-        let status = AuthStatus::from_query(&query);
-        println!("{:?} gets status {:?}", query.username, status);
-        if AuthStatus::from_query(&query) == AuthStatus::Unknown {
-            return auth_failed();
-        }
-
-        let target = path.into_inner();
-        if target == "screen" {
-            println!("target -> Screen");
-        } else {
-            println!("target ->> {}", target);
-        }
-        HttpResponse::Ok()
-            .content_type(ContentType::plaintext())
-            .body("")
     }
 
     pub async fn not_found(req: HttpRequest) -> HttpResponse {
@@ -145,25 +153,9 @@ pub mod methods {
             .body(format!("Error (404):\nPage not found <{}>", req.path()))
     }
 }
-/*
-#[get("/window/{hwnd}")]
-async fn window_screenshot(
-    state: web::Data<AppState>,
-    path: web::Path<usize>,
-) -> Option<impl Responder> {
-    let hwnd = path.into_inner() as isize;
-    println!("get item {}", hwnd);
-    let backend = state.backend.read().unwrap();
-    let Some(img) = backend.window_screenshot(hwnd) else {
-        return None;
-    };
-    Some(
-        HttpResponse::Ok()
-            .content_type(ContentType::jpeg())
-            .body(img),
-    )
-}
-*/
+
+//  //  //  //  //  //  //  //
+//  //  //  //  //  //  //  //
 #[derive(Debug, serde::Deserialize)]
 struct MainQuery {
     hwnd: Option<isize>,
@@ -173,28 +165,6 @@ struct MainQuery {
 struct CredentialsInfo {
     username: String,
     password: String,
-}
-
-#[derive(Debug, PartialEq)]
-enum AuthStatus {
-    Unknown,
-    Ok,
-}
-impl AuthStatus {
-    fn from_query(query: &actix_web::web::Query<CredentialsInfo>) -> Self {
-        Self::from_user(&query.username, &query.password)
-    }
-
-    fn from_user(user: &str, pass: &str) -> Self {
-        match (user, pass) {
-            ("tester", "42") => {
-                return Self::Ok;
-            }
-            _ => {
-                return Self::Unknown;
-            }
-        }
-    }
 }
 
 static HTML_LOGIN: &str = r#"
@@ -208,6 +178,14 @@ static HTML_LOGIN: &str = r#"
                     <input type="password" id="password" name="password"><br><br>
                     <button type="submit">Login</button>
                 </form>
+        </body>
+    </html>
+"#;
+
+static HTML_LIST: &str = r#"
+    <html>
+        <body>
+            {}
         </body>
     </html>
 "#;

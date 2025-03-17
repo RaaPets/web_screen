@@ -11,7 +11,7 @@ async fn main() -> std::io::Result<()> {
     let config = config::parse_cli();
     println!("WebScreen: {}:{}", config.bind, config.port);
 
-    let state = web::Data::new(AppState::new());
+    let state = web::Data::new(AppState::new(&config.user_name, &config.pin));
 
     HttpServer::new(move || {
         App::new()
@@ -20,7 +20,6 @@ async fn main() -> std::io::Result<()> {
             .service(post_auth)
             .service(get_welcome)
             .service(get_watch)
-            .service(screenshot)
             .default_service(web::route().to(not_found))
     })
     .bind((config.bind, config.port))?
